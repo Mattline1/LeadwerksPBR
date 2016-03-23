@@ -18,9 +18,11 @@ includes a level with some pre-built models and materials
 
 
 ---- DEMO ----
+
 Download the folder and run PBR.exe 
 
 ---- Demo Troubleshooting ----
+
 Requires an OpenGL 4.0 compliant video card 
 Requires OpenAL 32 bit to be installed 
 
