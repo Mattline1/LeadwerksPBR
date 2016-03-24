@@ -1,6 +1,8 @@
 # LeadwerksPBR
 A PBR system developed for the Leadwerks engine
 
+(This was orginally created to support a dissertation, for marking purposes a release is included which includes a snapshot of the repository as it was prior to the hand-in date)
+
 Drop the contents of the include folder into your projects directory
 
 include PBRLighting.h and PBRLighting.cpp
