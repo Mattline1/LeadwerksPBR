@@ -3,20 +3,23 @@ A PBR system developed for the Leadwerks engine
 
 (This was orginally created to support a dissertation, for marking purposes a release is included which includes a snapshot of the repository as it was prior to the hand-in date)
 
-Drop the contents of the include folder into your projects directory
 
-include PBRLighting.h and PBRLighting.cpp
+---- using PBR ---- 
 
-call PBR::Render() instead of world::Render()
+Copy the shaders into your project, overwriting the current files.
 
-use GenerateReflections() at any point to create a new reflection map
-- GenerateReflections takes a position as an argument, this determines where the reflection map is generated
-- Whilst it could be called every frame with the camera position to generate realtime reflections this will be very slow to render.
+to use PBR:
 
-In order to correctly display color information make sure GammaCorrection is used in the post process settings.
+- Make sure Gamma correction is the first shader in the post process stack 
+- Use the PBR specific shaders for materials, the material slots correspond to the following textures 
+	diffuse = albedo
+	normal = normal
+	specular = roughness
+	texture4 = metalness
+	
 
--Examples
-includes a level with some pre-built models and materials
+
+THIS IS STILL A WIP, currently only directional lights are supported. more lights and a decent tutorial should be added soon.
 
 
 ---- DEMO ----
