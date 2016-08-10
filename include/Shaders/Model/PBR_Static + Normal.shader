@@ -257,9 +257,9 @@ void main(void)
 					
 	//Normal map
 	vec3 normal = ex_normal;
-	//normal = texture(texture1,ex_texcoords0).xyz * 2.0 - 1.0;
-	//float ao = normal.z;
-	//normal = ex_tangent*normal.x + ex_binormal*normal.y + ex_normal*normal.z;
+	normal = texture(texture1,ex_texcoords0).xyz * 2.0 - 1.0;
+	float ao = normal.z;
+	normal = ex_tangent*normal.x + ex_binormal*normal.y + ex_normal*normal.z;
 	normal=normalize(normal);
 		
 	fragData2 = vec4(fgloss, fmetallic, 0.04, 0.0);		// a channel can be glow 	

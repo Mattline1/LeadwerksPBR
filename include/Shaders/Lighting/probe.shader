@@ -109,9 +109,9 @@ void main(void)
 #define KERNELF float(KERNEL)
 #define GLOSS 10.0
 
-#define PARALLAX_CUBEMAP 1
+#define PARALLAX_CUBEMAP 0
 
-#define AMBIENT_ROUGHNESS 7
+#define AMBIENT_ROUGHNESS 7.0
 #define SPECULAR_ROUGHNESS 0
 
 uniform vec4 lighting_ambient;
@@ -305,10 +305,11 @@ void main(void)
 		if ((1 & materialflags)!=0)
 		{		
 			specular =	surfacedata.b;				
-			gloss =		surfacedata.r;
+			gloss =		1 - surfacedata.r;
 			metalness = 1 - surfacedata.g;
 				
 			float specular_power  	= gloss*gloss;
+			vec3 grad = vec3(specular_power) * 0.5;
 			specular_colour = mix(albedo, vec4(specular), metalness) * lightcolor;
 			roughness 		= AMBIENT_ROUGHNESS - (specular_power * AMBIENT_ROUGHNESS);
 				
@@ -329,26 +330,21 @@ void main(void)
 				vec3 lightnormal = normalize(lightvector);	
 
 				//Fresnel effect
-				vec3 reflectvec 	= normalize(reflect(screencoord, normal));
+				vec3 reflectvec = normalize(reflect(screencoord, normal));
 				float exponent = pow(1.0f - clamp(dot(normal, reflectvec), 0.0, 1.0), 5.0f);		
-				vec3 fresnel_term = specular_colour.xyz + (1.0f - max(1.0 - vec3(specular_power), specular_colour.xyz)) * exponent;	
-				
-				//Ambient lighting
-				vec3 shadowcoord = cameranormalmatrix * normalize(reflect(lightnormal,normal));
-				float miplevel = max(int(textureQueryLod(texture5,shadowcoord).y), AMBIENT_ROUGHNESS);
-				vec4 ambient = textureLod(texture5,shadowcoord,miplevel) * albedo * metalness;
-
-				
+				vec3 fresnel_term = specular_colour.xyz + (1.0f - max(1.0 - vec3(1-specular_power), specular_colour.xyz)) * exponent;	
+								
 				//Specular reflection
 				shadowcoord = lightnormalmatrix * reflect(screennormal*flipcoord,normal);
 #if PARALLAX_CUBEMAP==1
 				shadowcoord=LocalCorrect(shadowcoord,ex_aabbmin,ex_aabbmax,vpos,vec3(lightglobalposition),0.0f);
 #endif
-				miplevel = max(textureQueryLod(texture5,shadowcoord).y, roughness);
-				vec4 specular = textureLod(texture5,shadowcoord,miplevel);	
-				specular *= vec4(fresnel_term,1.0);	
+								
+				//Ambient lighting				
+				vec4 ambient = textureGrad(texture5, lightnormalmatrix * normal, grad, grad) * albedo * metalness;
+				vec4 specular = textureGrad(texture5,shadowcoord,grad,grad) * vec4(fresnel_term,1.0);	
+				//specular = vec4(fresnel_term,1.0);
 				
-				//Max blend mode
 				fragData0 += (ambient + specular) * attenuation;				
 			}
 #if SAMPLES<2
