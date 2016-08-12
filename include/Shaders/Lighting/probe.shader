@@ -307,8 +307,8 @@ void main(void)
 			specular =	surfacedata.b;				
 			gloss =		1 - surfacedata.r;
 			metalness = 1 - surfacedata.g;
-				
-			float specular_power  	= gloss*gloss;
+			
+			float specular_power  	= gloss;
 			vec3 grad = vec3(specular_power) * 0.5;
 			specular_colour = mix(albedo, vec4(specular), metalness) * lightcolor;
 			roughness 		= AMBIENT_ROUGHNESS - (specular_power * AMBIENT_ROUGHNESS);
@@ -335,16 +335,17 @@ void main(void)
 				vec3 fresnel_term = specular_colour.xyz + (1.0f - max(1.0 - vec3(1-specular_power), specular_colour.xyz)) * exponent;	
 								
 				//Specular reflection
-				shadowcoord = lightnormalmatrix * reflect(screennormal*flipcoord,normal);
+				shadowcoord = lightnormalmatrix * reflect(screencoord, normal);
 #if PARALLAX_CUBEMAP==1
 				shadowcoord=LocalCorrect(shadowcoord,ex_aabbmin,ex_aabbmax,vpos,vec3(lightglobalposition),0.0f);
 #endif
 								
 				//Ambient lighting				
-				vec4 ambient = textureGrad(texture5, lightnormalmatrix * normal, grad, grad) * albedo * metalness;
+				vec4 ambient = textureGrad(texture5, lightnormalmatrix * normal, vec3(0.5), vec3(0.5)) * albedo * metalness;
 				vec4 specular = textureGrad(texture5,shadowcoord,grad,grad) * vec4(fresnel_term,1.0);	
 				//specular = vec4(fresnel_term,1.0);
 				
+				ambient = (lightcolor - specular) * ambient;
 				fragData0 += (ambient + specular) * attenuation;				
 			}
 #if SAMPLES<2
