@@ -1,9 +1,6 @@
 # LeadwerksPBR
 A PBR system developed for the Leadwerks engine
 
-(This was orginally created to support a dissertation, for marking purposes a release is included which includes a snapshot of the repository as it was prior to the hand-in date)
-
-
 ---- using PBR ---- 
 
 Copy the shaders into your project, overwriting the current files.
@@ -17,10 +14,6 @@ to use PBR:
 	specular = roughness
 	texture4 = metalness
 	
-
-
-THIS IS STILL A WIP, currently only directional lights are supported. more lights and a decent tutorial should be added soon.
-
 
 ---- DEMO ----
 
