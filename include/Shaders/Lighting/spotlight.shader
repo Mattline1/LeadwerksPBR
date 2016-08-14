@@ -141,6 +141,39 @@ float shadowLookup(in sampler2DShadow shadowmap, in vec3 shadowcoord, in float o
 	return f/(KERNEL*KERNEL);
 }
 
+vec4 F_Schlick(vec4 f0, float fd90, float u ) 
+{
+	return f0 + ( fd90 - f0 ) * pow (1.0f - u , 5.0f);
+}
+
+float V_SmithsGGX(float alpha, float n_dot_l, float n_dot_v)
+{
+	float k = alpha/2.f;
+	float G_l = 1.0/(n_dot_l * (1.0f - k) + k);
+	float G_v = 1.0/(n_dot_v * (1.0f - k) + k);
+	
+	return 1.0f / G_l*G_v;
+}
+
+float D_GGX(float alpha, float n_dot_h)
+{
+	float alphaSqr = alpha*alpha;
+	float denom = n_dot_h * n_dot_h *(alphaSqr-1.0) + 1.0f;
+	return alphaSqr/(PI * denom * denom);
+}
+
+vec4 Fd_DisneyDiffuse(vec4 f0, float n_dot_l, float n_dot_v, float l_dot_h, float gloss)
+{
+	float Bias = mix(0.0f , 0.5f , gloss);
+	float Factor = mix(1.0f , 1.0f / 1.51f , gloss);
+	float fd90 = Bias + 2.0f * l_dot_h * l_dot_h * gloss;
+				
+	vec4 Fl = 	F_Schlick(f0, fd90, n_dot_l);
+	vec4 Fv = 	F_Schlick(f0, fd90, n_dot_v);						
+	return Fl * Fv * Factor;
+
+}
+
 void main(void)
 {
 	vec3 flipcoord = vec3(1.0);	
@@ -175,7 +208,7 @@ void main(void)
 	vec4 normaldata;
 	vec4 samplenormal;		
 	vec4 surfacedata;
-	vec4 specular_colour;
+	vec4 speccolor;
 		
 	float lightdistance;
 	vec3 lightvector;
@@ -186,23 +219,8 @@ void main(void)
 	fragData0 = vec4(0.0);
 	
 	for (int i=0; i<max(1,SAMPLES); i++)
-	{
-		//----------------------------------------------------------------------
-		//Retrieve data from gbuffer
-		//----------------------------------------------------------------------
+	{		
 #if SAMPLES==0
-		float depth = 		texelFetch(texture0,icoord,i).x;
-		vec4 diffuse = 		texelFetch(texture1,icoord,i);
-		vec4 normaldata =	texelFetch(texture2,icoord,i);
-		vec4 emission = 	texelFetch(texture3,icoord,i);
-#else		
-		float depth = 		texelFetch(texture0,icoord,i).x;
-		vec4 diffuse = 		texelFetch(texture1,icoord,i);
-		vec4 normaldata =	texelFetch(texture2,icoord,i);
-		vec4 emission = 	texelFetch(texture3,icoord,i);
-#endif
-		
-		#if SAMPLES==0
 		depth = 		texture(texture0,coord).x;
 		albedo = 		texture(texture1,coord);
 		normaldata =	texture(texture2,coord);
@@ -224,61 +242,47 @@ void main(void)
 		
 		if ((1 & materialflags)!=0) // if use lighting
 		{			
-			normal = 	camerainversenormalmatrix * normalize(normaldata.xyz*2.0-1.0);	
-			specular =	surfacedata.b;				
-			gloss =		1 - surfacedata.r;
-			metalness = 1 - surfacedata.g;
-				
-			specular_colour = mix(albedo, vec4(specular), metalness) * PIlightcolor;
-		
-			lightvector = (screencoord - lightposition);
-			lightdistance = length(lightvector);	
-			lightnormal = normalize(lightvector);
+			specular 	=	surfacedata.b;				
+			gloss 		=		1 - surfacedata.r;
+			metalness 	= 1 - surfacedata.g;				
+			speccolor 	= mix(albedo, vec4(specular), metalness) * lightcolor;
 			
-			// ATTENUATION			
-			float n_dot_l = max(-dot(lightnormal, normal), 0.0);			
-			attenuation = n_dot_l * (1 / lightdistance); // linear fall off, spot lights focus light 
-			//TODO look into physically correct spotlight falloff, how does it change with spot angle?		
-			attenuation *= min(1.0, lightrange.y-lightdistance); //not physically correct but needed for performance			
+			float alpha = max(0.001, gloss*gloss);
 			
-			float denom = lightconeanglescos.y-lightconeanglescos.x;			
-			float anglecos = dot(lightnormal, lightdirection);
+			/////
+											
+			vec3  n 			= camerainversenormalmatrix * normalize(normaldata.xyz*2.0-1.0);	
+			vec3  lv 			= (screencoord - lightposition);
+			float ld 			= length(lv);			
+			vec3  l 			= normalize(lv);	
+			vec3  h 			= normalize(l + screennormal);
+			
+			float n_dot_l 		= clamp(-dot(l, n), 0.0, 1.0);
+			float n_dot_v 		= clamp(-dot(n, screennormal), 0.0, 1.0);
+			float n_dot_h 		= clamp(-dot(n, h), 0.0, 1.0);
+			float l_dot_h 		= clamp( dot(l, h), 0.0, 1.0);
+					
+					
+			//TODO look into physically correct spotlight falloff, how does it change with spot angle?	
+			attenuation 		= n_dot_l * (1 / ld); // linear fall off, spot lights focus light 					
+			attenuation 		*= min(1.0, lightrange.y-ld); //not physically correct but needed for performance
+			float denom 		= lightconeanglescos.y-lightconeanglescos.x;			
+			float anglecos 		= dot(l, lightdirection);
 			
 			if (denom>0.0)
 			{					
 				attenuation *= 1.0-clamp((lightconeanglescos.y-anglecos)/denom,0.0,1.0);
 			}
-			else
-			{
-		#if SAMPLES==1
-				if (anglecos<lightconeanglescos.x) discard;
-		#endif
-			}
-			
-			// DIFFUSE					
-			vec4 sample_diffuse = albedo*lightcolor*metalness;			
-
-			// SPECULAR - GGX
-			vec4 sample_specular = vec4(0.0);
-			
-			vec3 h_v = normalize( lightnormal + screennormal);	
-			float h_dot_n = clamp(-dot(h_v, normal), 0.0, 1.0);	
-			float n_dot_v = clamp(-dot(normal, screennormal), 0.0, 1.0);
-			float h_dot_l = dot(h_v, screennormal);	
 					
-			float alpha = gloss*gloss+0.00001;			
-			float _denom = h_dot_n * h_dot_n *(alpha-1.0) + 1.0f;
-			float D = alpha/(PI * _denom * _denom);
-				
-			float exponent = pow((1.0f - h_dot_l), 5.0f);		
-			vec4 F = specular_colour + ((1.0f - specular_colour) * exponent);	
-			
-			float k = 2.f/alpha;
-			float G_l = n_dot_l * (1.0f - k) + k;
-			float G_v = n_dot_v * (1.0f - k) + k;
-			float V = 1.0f/ G_l*G_v;
-			
-			sample_specular = F * D * V;
+		// Diffuse - BRDF
+			vec4 Fd 			= Fd_DisneyDiffuse(lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
+				 Fd 			*= albedo * metalness;				
+							
+		//Specular - BRDF
+			float D 			= D_GGX(alpha, n_dot_h);
+			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);
+			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);						
+			vec4  Fr			= F * D * V;
 		
 	#ifdef USESHADOW
 		
@@ -297,9 +301,8 @@ void main(void)
 		#endif	
 	#endif
 				
-		fragData0 += ( sample_diffuse + sample_specular ) * attenuation;
-		//Removes banding
-		//fragData0 += rand(lightnormal.xy) * 0.04 - 0.02;
+		Fd 			= (lightcolor - Fr) * Fd;
+		fragData0 	+= ( Fd + Fr ) * attenuation;
 		}
 	}
 		

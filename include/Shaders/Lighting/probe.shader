@@ -195,7 +195,7 @@ float gloss;
 float roughnessmip;
 float specular_power;	
 float roughness;
-vec4 specular_colour;
+vec4 speccolor;
 	
 vec4 sample_out;	
 
@@ -254,6 +254,45 @@ bool AABBIntersectsPoint(in vec3 aabbmin, in vec3 aabbmax, in vec3 p)
 	return true;
 }
 
+vec4 F_Schlick(vec4 f0, float fd90, float u ) 
+{
+	return f0 + ( fd90 - f0 ) * pow (1.0f - u , 5.0f);
+}
+
+vec4 F_Schlick_Roughness(vec4 f0, float fd90, float alpha, float u ) 
+{
+	return f0 + ( fd90 - max(1.0 - vec4(1-alpha), f0 ) ) * pow (1.0f - u , 5.0f);
+}
+
+float V_SmithsGGX(float alpha, float n_dot_l, float n_dot_v)
+{
+	float k = 2.f/alpha;
+	float G_l = (n_dot_l * (1.0f - k) + k);
+	float G_v = (n_dot_v * (1.0f - k) + k);
+	
+	return 1.0f / G_l*G_v;
+}
+
+float D_GGX(float alpha, float n_dot_h)
+{
+	float alphaSqr = alpha*alpha;
+	float denom = n_dot_h * n_dot_h *(alphaSqr-1.0) + 1.0f;
+	return alphaSqr/(PI * denom * denom);
+}
+
+vec4 Fd_DisneyDiffuse(vec4 f0, float n_dot_l, float n_dot_v, float l_dot_h, float gloss)
+{
+	float Bias = mix(0.0f , 0.5f , gloss);
+	float Factor = mix(1.0f , 1.0f / 1.51f , gloss);
+	float fd90 = Bias + 2.0f * l_dot_h * l_dot_h * gloss;
+				
+	vec4 Fl = 	F_Schlick(f0, fd90, n_dot_l);
+	vec4 Fv = 	F_Schlick(f0, fd90, n_dot_v);						
+	return Fl * Fv * Factor;
+
+}
+
+
 void main(void)
 {
 	vec3 flipcoord = vec3(1.0);	
@@ -291,33 +330,32 @@ void main(void)
 		normaldata =	texelFetch(texture2,icoord,i);
 		surfacedata = 	texelFetch(texture3,icoord,i);		
 #endif
-		normal = 		camerainversenormalmatrix * normalize(normaldata.xyz*2.0-1.0);
-
 		materialflags = int(normaldata.a * 255.0 + 0.5);
 		sample_out = 	albedo;
 		
 		screencoord = vec3(((gl_FragCoord.x/buffersize.x)-0.5) * 2.0 * (buffersize.x/buffersize.y),((-gl_FragCoord.y/buffersize.y)+0.5) * 2.0,depthToPosition(depth,camerarange));
 		screencoord.x *= screencoord.z / camerazoom;
 		screencoord.y *= -screencoord.z / camerazoom;		
-		screennormal = normalize(screencoord);		
+		screennormal = normalize(screencoord) * flipcoord;		
 		screencoord *= flipcoord;
 
 		if ((1 & materialflags)!=0)
 		{		
-			specular =	surfacedata.b;				
-			gloss =		1 - surfacedata.r;
-			metalness = 1 - surfacedata.g;
-			
-			float specular_power  	= gloss;
-			vec3 grad = vec3(specular_power) * 0.5;
-			specular_colour = mix(albedo, vec4(specular), metalness) * lightcolor;
-			roughness 		= AMBIENT_ROUGHNESS - (specular_power * AMBIENT_ROUGHNESS);
-				
 			//get vertex positions for local correction
 			vec3 vpos = (cameramatrix * vec4(screencoord,1)).xyz;
 			
 			if (AABBIntersectsPoint(ex_aabbmin-aabbpadding,ex_aabbmax+aabbpadding,vpos))
 			{
+				specular 	= surfacedata.b;				
+				gloss 		= 1 - surfacedata.r;
+				metalness 	= 1 - surfacedata.g;				
+				speccolor 	= mix(albedo, vec4(specular), metalness) * lightcolor;
+				
+				float alpha = max(0.001, gloss*gloss);	
+				vec3 grad 	= vec3(gloss) * 0.5;
+				
+				/////
+				
 				//Distance attenuation
 				float attenuation = 1.0 - max(0.0,(vpos.z-(ex_aabbmax.z))/aabbpadding);
 				attenuation *= 1.0 - max(0.0,(vpos.x-(ex_aabbmax.x))/aabbpadding);
@@ -325,28 +363,37 @@ void main(void)
 				attenuation *= 1.0 - max(0.0,(ex_aabbmin.x-(vpos.x))/aabbpadding);
 				attenuation *= 1.0 - max(0.0,(ex_aabbmin.y-(vpos.y))/aabbpadding);
 				attenuation *= 1.0 - max(0.0,(ex_aabbmin.z-(vpos.z))/aabbpadding);
-				
-				vec3 lightvector = (screencoord - lightposition);
-				vec3 lightnormal = normalize(lightvector);	
-
-				//Fresnel effect
-				vec3 reflectvec = normalize(reflect(screencoord, normal));
-				float exponent = pow(1.0f - clamp(dot(normal, reflectvec), 0.0, 1.0), 5.0f);		
-				vec3 fresnel_term = specular_colour.xyz + (1.0f - max(1.0 - vec3(1-specular_power), specular_colour.xyz)) * exponent;	
 								
-				//Specular reflection
-				shadowcoord = lightnormalmatrix * reflect(screencoord, normal);
+				vec3 n 				= camerainversenormalmatrix * normalize(normaldata.xyz*2.0-1.0);	
+				vec3 l 				= normalize(-n);	
+				vec3 h 				= normalize(l + screennormal);
+				
+				float n_dot_l 		= clamp(-dot(l, n), 0.0, 1.0);
+				float n_dot_v 		= clamp(-dot(n, screennormal), 0.0, 1.0);
+				float n_dot_h 		= clamp(-dot(n, h), 0.0, 1.0);
+				float l_dot_h 		= clamp( dot(l, h), 0.0, 1.0);
+					
+			// Diffuse - BRDF
+				vec4 ambient 		= textureGrad(texture5, lightnormalmatrix * n, vec3(0.5), vec3(0.5));
+				vec4 Fd 			= Fd_DisneyDiffuse(ambient * lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
+					 Fd 			*= albedo * metalness;	
+					 
+			//	Specular - BRDF
+				l 					= -normalize(reflect(screencoord, n));
+				shadowcoord 		= lightnormalmatrix * -l;
 #if PARALLAX_CUBEMAP==1
 				shadowcoord=LocalCorrect(shadowcoord,ex_aabbmin,ex_aabbmax,vpos,vec3(lightglobalposition),0.0f);
 #endif
+				h 					= normalize(l + screennormal);				
+				l_dot_h 			= clamp( dot(l, h), 0.0, 1.0);
 								
-				//Ambient lighting				
-				vec4 ambient = textureGrad(texture5, lightnormalmatrix * normal, vec3(0.5), vec3(0.5)) * albedo * metalness;
-				vec4 specular = textureGrad(texture5,shadowcoord,grad,grad) * vec4(fresnel_term,1.0);	
-				//specular = vec4(fresnel_term,1.0);
+				vec4 D 				= textureGrad(texture5, shadowcoord, grad, grad);				
+				//float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v); // no noticeable effect on final image								
+				vec4  F  			= F_Schlick_Roughness(speccolor, 1.0f, gloss, l_dot_h);				
+				vec4  Fr			= D * F;				
 				
-				ambient = (lightcolor - specular) * ambient;
-				fragData0 += (ambient + specular) * attenuation;				
+				Fd 			= (lightcolor - Fr) * Fd;
+				fragData0 	+= ( Fd + Fr ) * attenuation;				
 			}
 #if SAMPLES<2
 			else

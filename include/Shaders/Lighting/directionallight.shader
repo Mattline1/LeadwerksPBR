@@ -34,6 +34,7 @@ void main(void)
 @OpenGL4.Fragment
 #version 400
 #define PI 3.14159265359
+#define PIRECIPROCAL 0.3183098861837697
 #define HALFPI PI/2.0
 #define LOWERLIGHTTHRESHHOLD 0.001
 #ifndef SHADOWSTAGES
@@ -115,7 +116,8 @@ vec4 lin_to_srgb(vec4 val, float _gamma)
 		return vec4(ret_val, val.a);
 } 
 
-float rand(vec2 co){
+float rand(vec2 co)
+{
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
@@ -147,6 +149,39 @@ float shadowLookup(in sampler2DShadow shadowmap, in vec3 shadowcoord, in vec2 of
 	return f/(KERNEL*KERNEL);
 }
 
+vec4 F_Schlick(vec4 f0, float fd90, float u ) 
+{
+	return f0 + ( fd90 - f0 ) * pow (1.0f - u , 5.0f);
+}
+
+float V_SmithsGGX(float alpha, float n_dot_l, float n_dot_v)
+{
+	float k = 2.f/alpha;
+	float G_l = (n_dot_l * (1.0f - k) + k);
+	float G_v = (n_dot_v * (1.0f - k) + k);
+	
+	return 1.0f / G_l*G_v;
+}
+
+float D_GGX(float alpha, float n_dot_h)
+{
+	float alphaSqr = alpha*alpha;
+	float denom = n_dot_h * n_dot_h *(alphaSqr-1.0) + 1.0f;
+	return alphaSqr/(PI * denom * denom);
+}
+
+vec4 Fd_DisneyDiffuse(vec4 f0, float n_dot_l, float n_dot_v, float l_dot_h, float gloss)
+{
+	float Bias = mix(0.0f , 0.5f , gloss);
+	float Factor = mix(1.0f , 1.0f / 1.51f , gloss);
+	float fd90 = Bias + 2.0f * l_dot_h * l_dot_h * gloss;
+				
+	vec4 Fl = 	F_Schlick(f0, fd90, n_dot_l);
+	vec4 Fv = 	F_Schlick(f0, fd90, n_dot_v);						
+	return Fl * Fv * Factor;
+
+}
+
 void main(void)
 {
 	vec3 flipcoord = vec3(1.0);	
@@ -163,20 +198,12 @@ void main(void)
 		icoord.y = int(buffersize.y) - icoord.y;
 	}
 	
-	float depth;
-	vec4 diffuse;
-	vec3 normal;
-	vec4 materialdata;
-	float specularity;
-	float ao;
-	bool uselighting;
-	vec4 emission;	
-	vec4 sampleoutput;
+	float depth;	
+	vec3 normal;	
 	vec4 stagecolor;
 	vec3 screencoord;
 	vec3 screennormal;
-	float attenuation;	
-	vec3 lightreflection;
+	float attenuation;		
 	float fade;
 	vec3 shadowcoord;
 	float dist;
@@ -195,7 +222,7 @@ void main(void)
 	float gloss;
 	float roughnessmip;
 	float specular_power;	
-	vec4 specular_colour;
+	vec4 speccolor;
 		
 	vec4 sample_out;	
 	fragData0 = vec4(0.0);
@@ -226,37 +253,36 @@ void main(void)
 		screencoord *= flipcoord;
 		
 		if ((1 & materialflags)!=0)
-		{
-			normal = 	camerainversenormalmatrix * normalize(normaldata.xyz*2.0-1.0);	
-			specular =	surfacedata.b;				
-			gloss =		1 - surfacedata.r;
-			metalness = 1 - surfacedata.g;
-				
-			specular_colour = mix(albedo, vec4(specular), metalness) * lightcolor;
-						
-			vec3 lightnormal = normalize(lightdirection);				
-			float n_dot_l = clamp(-dot(lightnormal, normal), 0.0, 1.0);
-			attenuation = n_dot_l;							
-				
-			vec3 half_vector = normalize( lightnormal + screennormal);				
+		{			
+			specular 	= surfacedata.b;				
+			gloss 		= 1 - surfacedata.r;
+			metalness 	= 1 - surfacedata.g;				
+			speccolor 	= mix(albedo, vec4(specular), metalness) * lightcolor;
 			
-			float h_dot_n = clamp(-dot(half_vector, normal), 0.0, 1.0);	
-			float n_dot_v = clamp(-dot(normal, screennormal), 0.0, 1.0);
-			float h_dot_l = dot(half_vector, screennormal);	
+			float alpha = max(0.001, gloss*gloss);	
+			
+			/////
+			
+			vec3 n 				= camerainversenormalmatrix * normalize(normaldata.xyz*2.0-1.0);	
+			vec3 l 				= normalize(lightdirection);	
+			vec3 h 				= normalize(l + screennormal);
+			
+			float n_dot_l 		= clamp(-dot(l, n), 0.0, 1.0);
+			float n_dot_v 		= clamp(-dot(n, screennormal), 0.0, 1.0);
+			float n_dot_h 		= clamp(-dot(n, h), 0.0, 1.0);
+			float l_dot_h 		= clamp( dot(l, h), 0.0, 1.0);
+			
+			attenuation 		= n_dot_l;
 					
-			float alpha = gloss*gloss+0.00001;						
-			float denom = h_dot_n * h_dot_n *(alpha-1.0) + 1.0f;
-			float D = alpha/(PI * denom * denom);
-				
-			float exponent = pow((1.0f - h_dot_l), 5.0f);		
-			vec4 F = specular_colour + ((1.0f - specular_colour) * exponent);	
-			
-			float k = 2.f/alpha;
-			float G_l = n_dot_l * (1.0f - k) + k;
-			float G_v = n_dot_v * (1.0f - k) + k;
-			float V = 1.0f/ G_l*G_v;
-			
-			vec4 sample_specular = F * D * V;
+		// Diffuse - BRDF
+			vec4 Fd 			= Fd_DisneyDiffuse(lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
+				 Fd 			*= albedo * metalness;				
+							
+		//Specular - BRDF
+			float D 			= D_GGX(alpha, n_dot_h);
+			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);
+			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);						
+			vec4  Fr			= F * D * V;
 
 #ifdef USESHADOW
 			fade=1.0;
@@ -351,14 +377,12 @@ void main(void)
 				}
 			}
 #endif		
-			sample_out = (albedo*lightcolor*metalness + sample_specular) * attenuation;			
-		}
-		//Blend with red if selected
-		if ((2 & materialflags)!=0)
-		{
-			sampleoutput = (sampleoutput + vec4(1.0,0.0,0.0,0.0))/2.0;
-		}
-		fragData0 += vec4(sample_out.xyz, 1.0);		
+		// Energy conservation, TODO look into a more physically correct method
+			Fd 			= (lightcolor - Fr) * Fd; 			
+			sample_out 	= (Fd + Fr) * attenuation;	
+			
+		}		
+		fragData0 += vec4(sample_out.xyz, 1.0);	
 	}
 	
 	fragData0 /= float(max(1,SAMPLES));
