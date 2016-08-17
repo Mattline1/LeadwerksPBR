@@ -1,0 +1,22 @@
+//Leadwerks Material File
+
+blendmode=0
+castshadows=1
+zsort=0
+cullbackfaces=1
+depthtest=1
+pickmode=1
+depthmask=1
+diffuse=1.00000000,1.00000000,1.00000000,1.00000000
+specular=0.501960814,0.501960814,0.501960814,0.501960814
+alwaysuseshader=0
+roughness=0.50000000000000000
+mappingscale=1.00000000,1.00000000,1.00000000
+drawmode=-1
+
+shader="Shaders/PBR/PBR_Static.shader"
+texture0="./diffuse.tex"
+texture1="./normal.tex"
+texture2="./specular.tex"
+texture4="./non-metal.tex"
+texture5="./roughness.tex"

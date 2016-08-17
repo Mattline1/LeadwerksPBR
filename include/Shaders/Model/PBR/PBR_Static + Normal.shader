@@ -160,11 +160,11 @@ void main()
 // modified from Shaders/Model/Diffuse+Normal+Specular
 
 //Uniforms
-uniform sampler2D texture0;//ALbedo map
-uniform sampler2D texture1;//Normal map
-uniform sampler2D texture2;//Roughness map
-uniform sampler2D texture4;//Metalness map
-uniform samplerCube texture7;//ENV map
+uniform sampler2D texture0;		//Albedo map
+uniform sampler2D texture1;		//Normal map
+uniform sampler2D texture2;		//Specular map
+uniform sampler2D texture4;		//Metalness map
+uniform sampler2D texture5;		//Roughness map
 
 uniform vec4 lighting_ambient;
 uniform vec4 materialcolordiffuse;
@@ -242,27 +242,24 @@ void main(void)
 	screencoord.y *= -screencoord.z / camerazoom;   
 	vec3 nscreencoord = normalize(screencoord);
 	
-	fragData0 = srgb_to_lin(texture(texture0,ex_texcoords0), gamma); 
-	float fmetallic;
-	float fgloss;
+	vec4 albedo 		= srgb_to_lin( texture(texture0,ex_texcoords0) * materialcolordiffuse, gamma);
+	vec4 gloss 			= texture(texture5,ex_texcoords0);	
+	vec4 metalness		= texture(texture4,ex_texcoords0);
+	//vec4 specular 		= texture(texture2,ex_texcoords0);
 	
-	vec4 gloss = texture(texture2,ex_texcoords0);	
-	vec4 metalness= texture(texture4,ex_texcoords0);	
+	float fmetallic 	= (metalness.r + metalness.g + metalness.b) * 0.3333333;
+	float fgloss 		= (gloss.r + gloss.g  + gloss.b) * 0.3333333;
+	//float fspecular		= mix(0.001, 0.08, (metalness.r + metalness.g + metalness.b) * 0.3333333);
+		
+	fragData0 = albedo;
+	fragData2 = vec4(fgloss, fmetallic, 0.04, 0.0);	
 	
-	//albedo = srgb_to_lin(albedo * materialcolordiffuse, gamma);	
-	fmetallic = (metalness.r + metalness.g + metalness.b) * 0.3333333;
-	fgloss = (gloss.r + gloss.g  + gloss.b) * 0.3333333;
-
-	float invmetallic = 1-fmetallic;
-					
 	//Normal map
 	vec3 normal = ex_normal;
 	normal = texture(texture1,ex_texcoords0).xyz * 2.0 - 1.0;
 	float ao = normal.z;
 	normal = ex_tangent*normal.x + ex_binormal*normal.y + ex_normal*normal.z;
-	normal=normalize(normal);
-		
-	fragData2 = vec4(fgloss, fmetallic, 0.04, 0.0);		// a channel can be glow 	
+	normal=normalize(normal);	
 	
 #if BFN_ENABLED==1
 	//Best-fit normals
@@ -273,13 +270,11 @@ void main(void)
 	fragData1 = vec4(normalize(normal)*0.5+0.5,fragData0.a);
 #endif	
 		
-	//set material flags
-	int materialflags=1;	
-	//if (ex_selectionstate>0.0) materialflags += 2; <--selection colour is included in ambient light
-	if (decalmode==1) materialflags += 2;//brush
-	if (decalmode==2) materialflags += 4;//model	
-	if (decalmode==4) materialflags += 8;//terrain
-	
+	int materialflags=1;
+	if (ex_selectionstate>0.0) materialflags += 2;
+	if (decalmode==1) materialflags += 4;//brush
+	if (decalmode==2) materialflags += 8;//model
+	if (decalmode==4) materialflags += 16;//terrain	
 	fragData1.a = materialflags/255.0;	
 		
 }
