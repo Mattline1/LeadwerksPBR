@@ -252,7 +252,7 @@ void main(void)
 	float fspecular		= mix(0.001, 0.08, (specular.r + specular.g + specular.b) * 0.3333333);
 		
 	fragData0 = albedo;
-	fragData2 = vec4(fgloss, fmetallic, fspecular, 0.0);	
+	fragData2 = vec4(1-fgloss, fmetallic, fspecular, 0.0);	
 	
 	//Normal map
 	vec3 normal = ex_normal;

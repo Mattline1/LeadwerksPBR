@@ -243,6 +243,8 @@ void main(void)
 	vec3 nscreencoord = normalize(screencoord);	
 	
 	vec4 albedo 		= srgb_to_lin( texture(texture0,ex_texcoords0) * materialcolordiffuse, gamma);
+	if (albedo.a < 0.9) { discard; }
+	
 	vec4 gloss 			= texture(texture5,ex_texcoords0);	
 	vec4 metalness		= texture(texture4,ex_texcoords0);
 	vec4 specular 		= texture(texture2,ex_texcoords0);

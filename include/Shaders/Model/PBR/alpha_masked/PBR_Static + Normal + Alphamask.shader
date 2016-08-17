@@ -240,24 +240,27 @@ void main(void)
 	vec3 screencoord = vec3(((gl_FragCoord.x/buffersize.x)-0.5) * 2.0 * (buffersize.x/buffersize.y),((-gl_FragCoord.y/buffersize.y)+0.5) * 2.0,DepthToZPosition( gl_FragCoord.z ));
 	screencoord.x *= screencoord.z / camerazoom;
 	screencoord.y *= -screencoord.z / camerazoom;   
-	vec3 nscreencoord = normalize(screencoord);	
+	vec3 nscreencoord = normalize(screencoord);
 	
 	vec4 albedo 		= srgb_to_lin( texture(texture0,ex_texcoords0) * materialcolordiffuse, gamma);
+	if (albedo.a < 0.9) { discard; }
 	vec4 gloss 			= texture(texture5,ex_texcoords0);	
 	vec4 metalness		= texture(texture4,ex_texcoords0);
-	vec4 specular 		= texture(texture2,ex_texcoords0);
+	//vec4 specular 		= texture(texture2,ex_texcoords0);
 	
 	float fmetallic 	= (metalness.r + metalness.g + metalness.b) * 0.3333333;
 	float fgloss 		= (gloss.r + gloss.g  + gloss.b) * 0.3333333;
-	float fspecular		= mix(0.001, 0.08, (metalness.r + metalness.g + metalness.b) * 0.3333333);
+	//float fspecular		= mix(0.001, 0.08, (metalness.r + metalness.g + metalness.b) * 0.3333333);
 		
 	fragData0 = albedo;
 	fragData2 = vec4(1-fgloss, fmetallic, 0.04, 0.0);	
-					
 	
-	vec3 normal = ex_normal;	
-	normal=normalize(normal);
-	
+	//Normal map
+	vec3 normal = ex_normal;
+	normal = texture(texture1,ex_texcoords0).xyz * 2.0 - 1.0;
+	float ao = normal.z;
+	normal = ex_tangent*normal.x + ex_binormal*normal.y + ex_normal*normal.z;
+	normal=normalize(normal);	
 	
 #if BFN_ENABLED==1
 	//Best-fit normals
