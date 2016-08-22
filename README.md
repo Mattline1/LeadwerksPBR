@@ -10,12 +10,13 @@ to use PBR:
 - Make sure Gamma correction is the first shader in the post process stack 
 - Use the PBR specific shaders for materials, the material slots correspond to the following textures 
 - 
-	diffuse = albedo
-	normal = normal
-	specular = specular
+	diffuse 	= albedo
+	normal 		= normal
+	specular 	= specular
+	displacement 	= roughness
 
-	texture4 = metalness
-	texture5 = roughness
+	texture4 	= metalness
+	
 	
 
 ---- DEMO ----
