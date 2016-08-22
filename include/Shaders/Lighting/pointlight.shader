@@ -323,7 +323,7 @@ void main(void)
 	#endif	
 	
 	
-			Fd 			= (lightcolor - Fr) * Fd;
+			//Fd 			= (lightcolor - Fr) * Fd;
 			fragData0 	+= ( Fd + Fr ) * attenuation;
 		}	
 	}	

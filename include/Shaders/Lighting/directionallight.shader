@@ -378,10 +378,15 @@ void main(void)
 			}
 #endif		
 		// Energy conservation, TODO look into a more physically correct method
-			Fd 			= (lightcolor - Fr) * Fd; 			
-			sample_out 	= (Fd + Fr) * attenuation;	
-			
-		}		
+			//Fd 			= (max(lightcolor - Fr, 0.00001)) * Fd; 	
+						
+			sample_out 	= ( Fd + Fr) * attenuation;			
+			//sample_out  += albedo * metalness * ambientlight;			
+		} 
+		else 
+		{
+			sample_out *= lightcolor;
+		}
 		fragData0 += vec4(sample_out.xyz, 1.0);	
 	}
 	

@@ -109,7 +109,7 @@ void main(void)
 #define KERNELF float(KERNEL)
 #define GLOSS 10.0
 
-#define PARALLAX_CUBEMAP 0
+#define PARALLAX_CUBEMAP 1
 
 #define AMBIENT_ROUGHNESS 7.0
 #define SPECULAR_ROUGHNESS 0
@@ -133,7 +133,11 @@ uniform vec4 lighting_ambient;
 uniform mat3 cameranormalmatrix;
 uniform mat3 camerainversenormalmatrix;
 uniform vec3 cameraposition;
-uniform samplerCube texture5;//shadowmap
+
+
+uniform samplerCube texture5; //Reflection map
+
+
 uniform vec4 ambientlight;
 uniform vec2 buffersize;
 uniform vec3 lightposition;
@@ -254,6 +258,15 @@ bool AABBIntersectsPoint(in vec3 aabbmin, in vec3 aabbmax, in vec3 p)
 	return true;
 }
 
+float blendaabb(float limit, float vpos, float centre, float blend)
+{
+	float pos 	= mix(limit, centre, blend);
+	float dif 	= vpos - pos;
+	float range = limit - pos;
+				
+	return ( 1.0 - (dif / range) );		
+}
+
 vec4 F_Schlick(vec4 f0, float fd90, float u ) 
 {
 	return f0 + ( fd90 - f0 ) * pow (1.0f - u , 5.0f);
@@ -261,7 +274,11 @@ vec4 F_Schlick(vec4 f0, float fd90, float u )
 
 vec4 F_Schlick_Roughness(vec4 f0, float fd90, float alpha, float u ) 
 {
-	return f0 + ( fd90 - max(1.0 - vec4(1-alpha), f0 ) ) * pow (1.0f - u , 5.0f);
+	vec4 f90 = max(vec4(1-alpha), f0); 
+	
+	//return f0 + ( f90 - f0 ) * pow (1.0f - u , 5.0f);
+	
+	return f0 + ( f90 - f0 ) * pow (1.0f - u , 5.0f);
 }
 
 float V_SmithsGGX(float alpha, float n_dot_l, float n_dot_v)
@@ -292,7 +309,6 @@ vec4 Fd_DisneyDiffuse(vec4 f0, float n_dot_l, float n_dot_v, float l_dot_h, floa
 
 }
 
-
 void main(void)
 {
 	vec3 flipcoord = vec3(1.0);	
@@ -309,6 +325,7 @@ void main(void)
 		icoord.y = int(buffersize.y) - icoord.y;
 	}
 
+	
 	//AABB
 	float aabbf=lightrange.y;
 	vec3 aabbmin=lightglobalposition+vec3(-aabbf,-aabbf,-aabbf);
@@ -344,7 +361,7 @@ void main(void)
 			//get vertex positions for local correction
 			vec3 vpos = (cameramatrix * vec4(screencoord,1)).xyz;
 			
-			if (AABBIntersectsPoint(ex_aabbmin-aabbpadding,ex_aabbmax+aabbpadding,vpos))
+			if (AABBIntersectsPoint(ex_aabbmin,ex_aabbmax,vpos))
 			{
 				specular 	= surfacedata.b;				
 				gloss 		= 1 - surfacedata.r;
@@ -354,7 +371,7 @@ void main(void)
 				float alpha = max(0.001, gloss*gloss);	
 				vec3 grad 	= vec3(gloss) * 0.5;
 				
-				/////
+				/////				
 				
 				//Distance attenuation
 				float attenuation = 1.0 - max(0.0,(vpos.z-(ex_aabbmax.z))/aabbpadding);
@@ -363,7 +380,7 @@ void main(void)
 				attenuation *= 1.0 - max(0.0,(ex_aabbmin.x-(vpos.x))/aabbpadding);
 				attenuation *= 1.0 - max(0.0,(ex_aabbmin.y-(vpos.y))/aabbpadding);
 				attenuation *= 1.0 - max(0.0,(ex_aabbmin.z-(vpos.z))/aabbpadding);
-								
+												
 				vec3 n 				= camerainversenormalmatrix * normalize(normaldata.xyz*2.0-1.0);	
 				vec3 l 				= normalize(-n);	
 				vec3 h 				= normalize(l + screennormal);
@@ -391,9 +408,10 @@ void main(void)
 				//float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v); // no noticeable effect on final image								
 				vec4  F  			= F_Schlick_Roughness(speccolor, 1.0f, gloss, l_dot_h);				
 				vec4  Fr			= D * F;				
-				
+					
+					
 				Fd 			= (lightcolor - Fr) * Fd;
-				fragData0 	+= ( Fd + Fr ) * attenuation;				
+				fragData0 	+= ( Fd + Fr) * attenuation;				
 			}
 #if SAMPLES<2
 			else

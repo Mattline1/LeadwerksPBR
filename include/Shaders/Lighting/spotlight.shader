@@ -301,7 +301,7 @@ void main(void)
 		#endif	
 	#endif
 				
-		Fd 			= (lightcolor - Fr) * Fd;
+		//Fd 			= (max(lightcolor - Fr, 0.00001)) * Fd;
 		fragData0 	+= ( Fd + Fr ) * attenuation;
 		}
 	}
