@@ -164,7 +164,7 @@ uniform sampler2D texture0;		//Albedo map
 uniform sampler2D texture1;		//Normal map
 uniform sampler2D texture2;		//Specular map
 uniform sampler2D texture4;		//Metalness map
-uniform sampler2D texture5;		//Roughness map
+uniform sampler2D texture3;		//Roughness map
 
 uniform vec4 lighting_ambient;
 uniform vec4 materialcolordiffuse;
@@ -243,7 +243,7 @@ void main(void)
 	vec3 nscreencoord = normalize(screencoord);
 	
 	vec4 albedo 		= srgb_to_lin( texture(texture0,ex_texcoords0) * materialcolordiffuse, gamma);
-	vec4 gloss 			= texture(texture5,ex_texcoords0);	
+	vec4 gloss 			= texture(texture3,ex_texcoords0);	
 	vec4 metalness		= texture(texture4,ex_texcoords0);
 	//vec4 specular 		= texture(texture2,ex_texcoords0);
 	

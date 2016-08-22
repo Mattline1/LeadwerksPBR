@@ -152,7 +152,7 @@ uniform sampler2D texture0;		//Albedo map
 uniform sampler2D texture1;		//Normal map
 uniform sampler2D texture2;		//Specular map
 uniform sampler2D texture4;		//Metalness map
-uniform sampler2D texture5;		//Roughness map
+uniform sampler2D texture3;		//Roughness map
 
 //MSAA textures
 uniform sampler2DMS texture6;// depth
@@ -308,13 +308,13 @@ void main(void)
 	tc = mod(tc,1.0);
 	
 	vec4 albedo 		= srgb_to_lin( texture(texture0,tc) * materialcolordiffuse, 2.2);
-	vec4 gloss 			= texture(texture5,tc);	
+	vec4 gloss 			= texture(texture3,tc);	
 	vec4 metalness		= texture(texture4,tc);
-	vec4 specular 		= vec4(0.04);
+	//vec4 specular 		= vec4(0.04);
 	
 	float fmetallic 	= (metalness.r + metalness.g + metalness.b) * 0.3333333;
 	float fgloss 		= (gloss.r + gloss.g  + gloss.b) * 0.3333333;
-	float fspecular		= mix(0.001, 0.08, (metalness.r + metalness.g + metalness.b) * 0.3333333);
+	//float fspecular		= mix(0.001, 0.08, (metalness.r + metalness.g + metalness.b) * 0.3333333);
 		
 	fragData0 = albedo * materialcolordiffuse * vColor;
 	fragData2 = vec4(1-fgloss, fmetallic, 0.04, albedo.a);	
