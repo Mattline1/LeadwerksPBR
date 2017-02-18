@@ -218,6 +218,8 @@ void main(void)
 	vec4 sample_out;	
 	fragData0 = vec4(0.0);
 	
+	vec4 lightPower = lightcolor * PI;
+	
 	for (int i=0; i<max(1,SAMPLES); i++)
 	{		
 #if SAMPLES==0
@@ -243,9 +245,9 @@ void main(void)
 		if ((1 & materialflags)!=0) // if use lighting
 		{			
 			specular 	=	surfacedata.b;				
-			gloss 		=		1 - surfacedata.r;
-			metalness 	= 1 - surfacedata.g;				
-			speccolor 	= mix(albedo, vec4(specular), metalness) * lightcolor;
+			gloss 		=	1 - surfacedata.r;
+			metalness 	= 	1 - surfacedata.g;				
+			speccolor 	= 	mix(albedo, vec4(specular), metalness);
 			
 			float alpha = max(0.001, gloss*gloss);
 			
@@ -275,21 +277,21 @@ void main(void)
 			}
 					
 		// Diffuse - BRDF
-			vec4 Fd 			= Fd_DisneyDiffuse(lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
+			vec4 Fd 			= Fd_DisneyDiffuse(lightPower, n_dot_l, n_dot_v, l_dot_h, gloss);
 				 Fd 			*= albedo * metalness;				
 							
 		//Specular - BRDF
+			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);
 			float D 			= D_GGX(alpha, n_dot_h);
-			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);
-			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);						
-			vec4  Fr			= F * D * V;
+			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);									
+			vec4  Fr			= F * D * V * lightPower;
 		
 	#ifdef USESHADOW
 		
 		//----------------------------------------------------------------------
 		//Shadow lookup
 		//----------------------------------------------------------------------
-		vec3 shadowcoord = lightnormalmatrix * lightvector;
+		vec3 shadowcoord = lightnormalmatrix * lv;
 		shadowcoord.x /= -shadowcoord.z/0.5;
 		shadowcoord.y /= shadowcoord.z/0.5;
 		shadowcoord.x += 0.5;

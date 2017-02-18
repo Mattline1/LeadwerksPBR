@@ -232,10 +232,12 @@ void main(void)
 	float lightdistance;
 	vec3 lightvector;
 	vec3 lightnormal;
-	vec4 PIlightcolor = lightcolor*PI; 
+	vec4 lightPower = lightcolor*PI; 
 		
 	vec4 sample_out;	
 	fragData0 = vec4(0.0);
+	
+	
 	
 	for (int i=0; i<max(1,SAMPLES); i++)
 	{
@@ -287,40 +289,40 @@ void main(void)
 			attenuation 		*= min(1.0, lightrange.y-ld);
 					
 		// Diffuse - BRDF
-			vec4 Fd 			= Fd_DisneyDiffuse(lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
+			vec4 Fd 			= Fd_DisneyDiffuse(lightPower, n_dot_l, n_dot_v, l_dot_h, gloss);
 				 Fd 			*= albedo * metalness;				
 							
 		//Specular - BRDF
+			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);
 			float D 			= D_GGX(alpha, n_dot_h);
-			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);
-			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);						
-			vec4  Fr			= F * D * V;
+			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);									
+			vec4  Fr			= F * D * V * lightPower;
 			
-	#ifdef USESHADOW
-			vec4 shadowcoord = vec4(lightnormalmatrix*lightvector,1.0);
-			
-			vec3 sampleroffsetx,sampleroffsety;
-			switch (getMajorAxis(shadowcoord.xyz))
-			{
-			case 0:
-				shadowcoord.w = abs(shadowcoord.x);
-				sampleroffsetx = vec3(0.0,0.0,shadowcoord.x*2.0/shadowmapsize);
-				sampleroffsety = vec3(0.0,shadowcoord.x*2.0/shadowmapsize,0.0);
-				break;
-			case 1:
-				shadowcoord.w = abs(shadowcoord.y);
-				sampleroffsetx = vec3(shadowcoord.y*2.0/shadowmapsize,0.0,0.0);
-				sampleroffsety = vec3(0.0,0.0,shadowcoord.y*2.0/shadowmapsize);
-				break;
-			default:
-				shadowcoord.w = abs(shadowcoord.z);
-				sampleroffsetx = vec3(shadowcoord.z*2.0/shadowmapsize,0.0,0.0);
-				sampleroffsety = vec3(0.0,shadowcoord.z*2.0/shadowmapsize,0.0);
-				break;
-			}
-			shadowcoord.w = positionToDepth(shadowcoord.w * lightshadowmapoffset.y*0.98 - lightshadowmapoffset.x,lightrange);
-			attenuation *= shadowLookup(texture5,shadowcoord,sampleroffsetx,sampleroffsety);	
-	#endif	
+#ifdef USESHADOW
+	vec4 shadowcoord = vec4(lightnormalmatrix*lv,1.0);
+	
+	vec3 sampleroffsetx,sampleroffsety;
+	switch (getMajorAxis(shadowcoord.xyz))
+	{
+	case 0:
+		shadowcoord.w = abs(shadowcoord.x);
+		sampleroffsetx = vec3(0.0,0.0,shadowcoord.x*2.0/shadowmapsize);
+		sampleroffsety = vec3(0.0,shadowcoord.x*2.0/shadowmapsize,0.0);
+		break;
+	case 1:
+		shadowcoord.w = abs(shadowcoord.y);
+		sampleroffsetx = vec3(shadowcoord.y*2.0/shadowmapsize,0.0,0.0);
+		sampleroffsety = vec3(0.0,0.0,shadowcoord.y*2.0/shadowmapsize);
+		break;
+	default:
+		shadowcoord.w = abs(shadowcoord.z);
+		sampleroffsetx = vec3(shadowcoord.z*2.0/shadowmapsize,0.0,0.0);
+		sampleroffsety = vec3(0.0,shadowcoord.z*2.0/shadowmapsize,0.0);
+		break;
+	}
+	shadowcoord.w = positionToDepth(shadowcoord.w * lightshadowmapoffset.y*0.98 - lightshadowmapoffset.x,lightrange);
+	attenuation *= shadowLookup(texture5,shadowcoord,sampleroffsetx,sampleroffsety);	
+#endif
 	
 	
 			//Fd 			= (lightcolor - Fr) * Fd;

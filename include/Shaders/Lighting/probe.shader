@@ -410,7 +410,7 @@ void main(void)
 				vec4  Fr			= D * F;				
 					
 					
-				Fd 			= (lightcolor - Fr) * Fd;
+				//Fd 			= (lightcolor - Fr) * Fd;
 				fragData0 	+= ( Fd + Fr) * attenuation;				
 			}
 #if SAMPLES<2
