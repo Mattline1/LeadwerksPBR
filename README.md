@@ -1,6 +1,11 @@
 # LeadwerksPBR
 A PBR system developed for the Leadwerks engine
 
+![alt text](https://4.bp.blogspot.com/-lkjGWU7btiI/WQeAlOjxi9I/AAAAAAAAEPc/asDlE3DuHHgCocMZlMQncejVOSVtbj7YwCLcB/s1600/Sponza.jpg)
+
+---- Details here: http://www.martinkearl.co.uk/2017/05/leadwerks-pbr-2.html ----
+
+
 ---- using PBR ---- 
 
 Copy the shaders into your project, overwriting the current files.
