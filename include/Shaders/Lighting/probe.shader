@@ -109,9 +109,9 @@ void main(void)
 #define KERNELF float(KERNEL)
 #define GLOSS 10.0
 
-#define PARALLAX_CUBEMAP 1
+#define PARALLAX_CUBEMAP 0
 
-#define AMBIENT_ROUGHNESS 7.0
+#define AMBIENT_ROUGHNESS 6.0
 #define SPECULAR_ROUGHNESS 0
 
 uniform vec4 lighting_ambient;
@@ -364,13 +364,13 @@ void main(void)
 			if (AABBIntersectsPoint(ex_aabbmin,ex_aabbmax,vpos))
 			{
 				specular 	= surfacedata.b;				
-				gloss 		= 1 - surfacedata.r;
+				gloss 		= surfacedata.r;
 				metalness 	= 1 - surfacedata.g;				
 				speccolor 	= mix(albedo, vec4(specular), metalness) * lightcolor;
 				
-				float alpha = max(0.001, gloss*gloss);	
-				vec3 grad 	= vec3(gloss) * 0.5;
-				
+				float alpha = max(0.001, 1-pow(gloss, 4));	
+				//float alpha = max(0.001, 1-gloss);	
+				int mip 	= int(mix(0.0, AMBIENT_ROUGHNESS, alpha));				
 				/////				
 				
 				//Distance attenuation
@@ -391,7 +391,7 @@ void main(void)
 				float l_dot_h 		= clamp( dot(l, h), 0.0, 1.0);
 					
 			// Diffuse - BRDF
-				vec4 ambient 		= textureGrad(texture5, lightnormalmatrix * n, vec3(0.5), vec3(0.5));
+				vec4 ambient 		= textureLod(texture5, lightnormalmatrix * n, AMBIENT_ROUGHNESS);
 				vec4 Fd 			= Fd_DisneyDiffuse(ambient * lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
 					 Fd 			*= albedo * metalness;	
 					 
@@ -404,14 +404,15 @@ void main(void)
 				h 					= normalize(l + screennormal);				
 				l_dot_h 			= clamp( dot(l, h), 0.0, 1.0);
 								
-				vec4 D 				= textureGrad(texture5, shadowcoord, grad, grad);				
+				vec4 D 				= textureLod(texture5, shadowcoord, mip);				
 				//float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v); // no noticeable effect on final image								
 				vec4  F  			= F_Schlick_Roughness(speccolor, 1.0f, gloss, l_dot_h);				
 				vec4  Fr			= D * F;				
 					
 					
 				//Fd 			= (lightcolor - Fr) * Fd;
-				fragData0 	+= ( Fd + Fr) * attenuation;				
+				fragData0 	+= ( Fd + Fr) * attenuation;	
+				//fragData0 += D;
 			}
 #if SAMPLES<2
 			else
