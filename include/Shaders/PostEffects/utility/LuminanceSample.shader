@@ -46,6 +46,8 @@ void main(void)
 
 uniform int samples;
 uniform float seed;
+uniform float threshold;
+
 uniform sampler2D texture0;
 uniform sampler2D texture1;
 
@@ -70,32 +72,40 @@ vec4 lin_to_srgb(vec4 val, float _gamma)
         return (1 + a) * pow(val, vec4(1.0/ _gamma)) - a;
 } 
 
+float lin_to_srgb(float val, float _gamma)
+{
+        float a = 0.055;
+        return (1 + a) * pow(val, 1.0/_gamma) - a;
+} 
+
+float flatten(vec4 tex){
+	return tex.r*0.3 + tex.g*0.59 + tex.b*0.11;
+}
+
 // this is a heavy shader! only run it on a small number of pixels
 void main(void)
 {
-	vec4 accumulate;
+	float accumulate;
 	for (int i = 0 ; i < samples; i++)
-	{
-		//i += seed;
+	{		
 		float a = 1/(i*seed);
 		float x = rand(vec2(a, 1-a));
 		float y = rand(vec2(1-a, a));
-		accumulate += texture( texture0, vec2(x,y) );
-		
+		accumulate += flatten(texture( texture0, vec2(x,y)));			
 	}
-				
-	vec4 previous = texture( texture1, vec2(0.5) );
 	accumulate /= samples;
 	
-	float gamma = 2.2;
-	//previous 	= pow(previous, vec4(1.0 / gamma));
+	float previous = flatten(texture( texture1, vec2(0.5)));	
+	
+	float gamma = 2.2;	
 	accumulate  = lin_to_srgb(accumulate, gamma);	
 	
-	//fragData0 = accumulate;
-	vec4 dif = accumulate - previous;
-	dif = sign(dif)*0.003;
+	float dif = accumulate - previous;
 	
-	fragData0 = previous + dif;
-	//fragData0 = mix(previous, accumulate, 0.2);
-	//fragData0 = vec4(0.5);
+	if (abs(dif) > threshold){
+		dif = sign(dif)*0.01;	
+		fragData0 = previous + vec4(dif);	
+	}else{
+		fragData0 = vec4(previous);	
+	}
 }

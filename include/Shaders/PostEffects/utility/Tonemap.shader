@@ -32,28 +32,22 @@ void main(void)
 	gl_Position = projectionmatrix * (drawmatrix * vec4(position[gl_VertexID]+offset, 0.0, 1.0));
 }
 @OpenGL4.Fragment
-//This shader should not be attached directly to a camera. Instead, use the bloom script effect.
 #version 400
 
-//-------------------------------------
-//MODIFIABLE UNIFORMS
-//-------------------------------------
-uniform float cutoff=0.25;//The lower this value, the more blurry the scene will be
-uniform float overdrive=1.0;//The higher this value, the brighter the bloom effect will be
-//-------------------------------------
-//
-//-------------------------------------
-
-uniform sampler2D texture0;//Diffuse
-uniform sampler2D texture1;//Bloom
+uniform sampler2D texture0;
+uniform sampler2D texture1;
 uniform bool isbackbuffer;
 uniform vec2 buffersize;
 uniform float currenttime;
 
-uniform float fstopmax;
-uniform float fstopmin;
+uniform float ExposureBias;
 
 out vec4 fragData0;
+
+// abberation
+
+const vec2 offset = vec2(0.000, 0.000);
+//const vec2 offset = vec2(0.000, 0.000);
 
 // Filmic Tonemapping
 // source: http://filmicgames.com/archives/75
@@ -87,40 +81,22 @@ vec3 Uncharted2Tonemap(vec3 x)
    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
 }
 
-void main(void)
-{
+float flatten(vec4 tex){
+	return tex.r*0.3 + tex.g*0.59 + tex.b*0.11;
+}
+
+void main(void) {
 	vec2 texcoord = vec2(gl_FragCoord.xy/buffersize);
 	if (isbackbuffer) texcoord.y = 1.0 - texcoord.y;
+		
+	vec4 scene = texture(texture0, texcoord);	
+	vec4 exposurecolor = texture(texture1,texcoord);	
 	
-	vec4 scene = texture(texture0, texcoord);
+	scene /= flatten(exposurecolor);
 	
-	vec4 exposurecolor = texture(texture1,texcoord);
-	float avgLuminance = exposurecolor.r + exposurecolor.g  + exposurecolor.b ;	
-	avgLuminance *= 0.3333333333;
-	//avgLuminance = min(1.0, avgLuminance*1.8);
-	
-	//float irisadjustment = 1.0 / (avgLuminance/0.25);
-	//irisadjustment = clamp(irisadjustment,1.0,2.0);
-	//scene *= irisadjustment;
-	
-	scene *= mix(fstopmax, fstopmin, avgLuminance);		
-	float ExposureBias = 2.0;
-	vec3 curr = Uncharted2Tonemap(ExposureBias*scene.rgb);
-	
+	vec3 curr = Uncharted2Tonemap(ExposureBias*scene.rgb);	
 	vec3 whiteScale = 1.0/Uncharted2Tonemap(vec3(W));
-	vec3 color = curr*whiteScale;
+	vec3 color = curr*whiteScale;	
 	
-	
-	//color = 	texture(texture0, texcoord).rgb;
-	vec3 retColor = lin_to_srgb(vec4(color, 1.0), 2.2).rgb;
-	
-	
-	// Gamma correction 
-    //vec3 mapped = pow(retColor, vec3(1.0 / 2.2));  
-    fragData0 = 	vec4(retColor, 1.0);
-	//fragData0 = 	texture(texture0, texcoord);
-	//if (texcoord.x < 0.2 && texcoord.y < 0.2)
-	//{
-		//fragData0 = exposurecolor;
-	//}
+    fragData0 = vec4(lin_to_srgb(vec4(color, 1.0), 2.2).rgb, 1.0);	
 }
