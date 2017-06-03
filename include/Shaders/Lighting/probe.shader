@@ -356,7 +356,7 @@ void main(void)
 			if (AABBIntersectsPoint(ex_aabbmin-aabbpadding,ex_aabbmax+aabbpadding,vpos))
 			{
 				specular 	= surfacedata.b;				
-				gloss 		= 1 - surfacedata.r;
+				gloss 		= surfacedata.r;
 				metalness 	= 1 - surfacedata.g;				
 				speccolor 	= mix(albedo, vec4(specular), metalness) * lightcolor;
 				
