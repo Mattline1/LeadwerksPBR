@@ -36,9 +36,6 @@ void main(void)
 	scale.z = 1.0 + aabbpadding / scale.z * 2.0;
 		
 	gl_Position = projectioncameramatrix * entitymatrix * vec4(vertex_position * scale,1.0);
-	ex_VertexCameraPosition = vec3(camerainversematrix * gl_Position);
-
-
 	ex_aabbmin = (entitymatrix * vec4(-0.5,-0.5,-0.5,1.0)).xyz;
 	ex_aabbmax = (entitymatrix * vec4(0.5,0.5,0.5,1.0)).xyz;
 	ex_localaabbmin = (projectioncameramatrix * vec4(ex_aabbmin,1.0)).xyz;
@@ -86,9 +83,6 @@ void main(void)
 	scale.z = 1.0 + aabbpadding / scale.z * 2.0;
 		
 	gl_Position = projectioncameramatrix * entitymatrix * vec4(vertex_position * scale,1.0);
-	ex_VertexCameraPosition = vec3(camerainversematrix * gl_Position);
-
-
 	ex_aabbmin = (entitymatrix * vec4(-0.5,-0.5,-0.5,1.0)).xyz;
 	ex_aabbmax = (entitymatrix * vec4(0.5,0.5,0.5,1.0)).xyz;
 	ex_localaabbmin = (projectioncameramatrix * vec4(ex_aabbmin,1.0)).xyz;
@@ -109,9 +103,9 @@ void main(void)
 #define KERNELF float(KERNEL)
 #define GLOSS 10.0
 
-#define PARALLAX_CUBEMAP 0
+#define PARALLAX_CUBEMAP 1
 
-#define AMBIENT_ROUGHNESS 6.0
+#define AMBIENT_ROUGHNESS 7.0
 #define SPECULAR_ROUGHNESS 0
 
 uniform vec4 lighting_ambient;
@@ -274,10 +268,7 @@ vec4 F_Schlick(vec4 f0, float fd90, float u )
 
 vec4 F_Schlick_Roughness(vec4 f0, float fd90, float alpha, float u ) 
 {
-	vec4 f90 = max(vec4(1-alpha), f0); 
-	
-	//return f0 + ( f90 - f0 ) * pow (1.0f - u , 5.0f);
-	
+	vec4 f90 = max(vec4(1-alpha), f0);	
 	return f0 + ( f90 - f0 ) * pow (1.0f - u , 5.0f);
 }
 
@@ -327,6 +318,7 @@ void main(void)
 
 	
 	//AABB
+	//float aabbpadding = length(lightspecular);
 	float aabbf=lightrange.y;
 	vec3 aabbmin=lightglobalposition+vec3(-aabbf,-aabbf,-aabbf);
 	vec3 aabbmax=lightglobalposition+vec3(aabbf,aabbf,aabbf);
@@ -361,16 +353,16 @@ void main(void)
 			//get vertex positions for local correction
 			vec3 vpos = (cameramatrix * vec4(screencoord,1)).xyz;
 			
-			if (AABBIntersectsPoint(ex_aabbmin,ex_aabbmax,vpos))
+			if (AABBIntersectsPoint(ex_aabbmin-aabbpadding,ex_aabbmax+aabbpadding,vpos))
 			{
 				specular 	= surfacedata.b;				
-				gloss 		= surfacedata.r;
+				gloss 		= 1 - surfacedata.r;
 				metalness 	= 1 - surfacedata.g;				
 				speccolor 	= mix(albedo, vec4(specular), metalness) * lightcolor;
 				
 				float alpha = max(0.001, 1-pow(gloss, 4));	
-				//float alpha = max(0.001, 1-gloss);	
-				int mip 	= int(mix(0.0, AMBIENT_ROUGHNESS, alpha));				
+				int mip 	= int(mix(0.0, AMBIENT_ROUGHNESS, alpha));
+				
 				/////				
 				
 				//Distance attenuation
@@ -390,12 +382,7 @@ void main(void)
 				float n_dot_h 		= clamp(-dot(n, h), 0.0, 1.0);
 				float l_dot_h 		= clamp( dot(l, h), 0.0, 1.0);
 					
-			// Diffuse - BRDF
-				vec4 ambient 		= textureLod(texture5, lightnormalmatrix * n, AMBIENT_ROUGHNESS);
-				vec4 Fd 			= Fd_DisneyDiffuse(ambient * lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
-					 Fd 			*= albedo * metalness;	
-					 
-			//	Specular - BRDF
+			// Specular - BRDF
 				l 					= -normalize(reflect(screencoord, n));
 				shadowcoord 		= lightnormalmatrix * -l;
 #if PARALLAX_CUBEMAP==1
@@ -404,15 +391,18 @@ void main(void)
 				h 					= normalize(l + screennormal);				
 				l_dot_h 			= clamp( dot(l, h), 0.0, 1.0);
 								
-				vec4 D 				= textureLod(texture5, shadowcoord, mip);				
-				//float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v); // no noticeable effect on final image								
-				vec4  F  			= F_Schlick_Roughness(speccolor, 1.0f, gloss, l_dot_h);				
-				vec4  Fr			= D * F;				
-					
-					
-				//Fd 			= (lightcolor - Fr) * Fd;
-				fragData0 	+= ( Fd + Fr) * attenuation;	
-				//fragData0 += D;
+				vec4 D 				= textureLod(texture5, shadowcoord, mip);
+				vec4  F  			= F_Schlick_Roughness(speccolor, 1.0f, 1-gloss, l_dot_h);				
+				vec4  Fr			= D * F;
+			
+			
+			// Diffuse - BRDF
+				vec4 Kd 			= vec4(1.0) - F;
+				vec4 ambient 		= textureLod(texture5, lightnormalmatrix * n, AMBIENT_ROUGHNESS);
+				vec4 Fd 			= Fd_DisneyDiffuse(ambient * lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
+					 Fd 			*= Kd * albedo * metalness;	
+				
+				fragData0 	+= (Fd + Fr) * attenuation;				
 			}
 #if SAMPLES<2
 			else

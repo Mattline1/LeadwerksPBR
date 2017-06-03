@@ -88,15 +88,20 @@ void main(void)
 	{
 #if SAMPLES==0
 		vec4 samplediffuse = texture(texture1,coord);
-		vec4 samplenormal = texture(texture2,coord);		
+		vec4 samplenormal = texture(texture2,coord);	
+		vec4 surfacedata = 	texture(texture3,coord);
 #else
 		vec4 samplediffuse = texelFetch(texture1,icoord,i);
-		vec4 samplenormal = texelFetch(texture2,icoord,i);		
+		vec4 samplenormal = texelFetch(texture2,icoord,i);	
+		vec4 surfacedata = 	texelFetch(texture3,icoord,i);
 #endif
+		
+		float metalness = 1 - surfacedata.g;
+		float emissive	= surfacedata.a;
 		
 		int materialflags = int(samplenormal.a * 255.0 + 0.5);
 		bool uselighting = false;
-		if ((1 & materialflags)!=0) samplediffuse *= ambientlight;		
+		if ((1 & materialflags)!=0) samplediffuse *= ambientlight * metalness + (emissive*24);		
 		fragData0 += samplediffuse;
 	}
 	

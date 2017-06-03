@@ -388,12 +388,7 @@ void main(void)
 				float n_dot_v 		= clamp(-dot(n, screennormal), 0.0, 1.0);
 				float n_dot_h 		= clamp(-dot(n, h), 0.0, 1.0);
 				float l_dot_h 		= clamp( dot(l, h), 0.0, 1.0);
-					
-			// Diffuse - BRDF
-				vec4 ambient 		= textureLod(texture5, lightnormalmatrix * n, AMBIENT_ROUGHNESS);
-				vec4 Fd 			= Fd_DisneyDiffuse(ambient * lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
-					 Fd 			*= albedo * metalness;	
-					 
+			
 			//	Specular - BRDF
 				l 					= -normalize(reflect(screencoord, n));
 				shadowcoord 		= lightnormalmatrix * -l;
@@ -405,12 +400,17 @@ void main(void)
 								
 				vec4 D 				= textureLod(texture5, shadowcoord, mip);				
 				//float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v); // no noticeable effect on final image								
-				vec4  F  			= F_Schlick_Roughness(speccolor, 1.0f, gloss, l_dot_h);				
-				vec4  Fr			= D * F;				
-					
-					
-				//Fd 			= (lightcolor - Fr) * Fd;
-				fragData0 	+= ( Fd + Fr) * attenuation;				
+				vec4  F  			= F_Schlick_Roughness(speccolor, 1.0f, 1-gloss, l_dot_h);				
+				vec4  Fr			= D * F;
+			
+			
+			// Diffuse - BRDF
+				vec4 Kd 			= vec4(1.0) - F;
+				vec4 ambient 		= textureLod(texture5, lightnormalmatrix * n, AMBIENT_ROUGHNESS);
+				vec4 Fd 			= Fd_DisneyDiffuse(ambient * lightcolor, n_dot_l, n_dot_v, l_dot_h, gloss);
+					 Fd 			*= Kd * albedo * metalness;	
+				
+				fragData0 	+= (Fd + Fr) * attenuation;				
 			}
 #if SAMPLES<2
 			else

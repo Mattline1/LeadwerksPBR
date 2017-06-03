@@ -287,16 +287,17 @@ void main(void)
 			attenuation 		= n_dot_l * (1 / (ld*ld));
 			attenuation 		*= lightrange.y*0.1;
 			attenuation 		*= min(1.0, lightrange.y-ld);
-					
-		// Diffuse - BRDF
-			vec4 Fd 			= Fd_DisneyDiffuse(lightPower, n_dot_l, n_dot_v, l_dot_h, gloss);
-				 Fd 			*= albedo * metalness;				
-							
+									
 		//Specular - BRDF
 			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);
 			float D 			= D_GGX(alpha, n_dot_h);
 			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);									
 			vec4  Fr			= F * D * V * lightPower;
+			
+		// Diffuse - BRDF
+			vec4 Kd 			= vec4(1.0) - F;
+			vec4 Fd 			= Fd_DisneyDiffuse(lightPower, n_dot_l, n_dot_v, l_dot_h, gloss);
+				 Fd 			*= Kd * albedo * metalness;	
 			
 #ifdef USESHADOW
 	vec4 shadowcoord = vec4(lightnormalmatrix*lv,1.0);

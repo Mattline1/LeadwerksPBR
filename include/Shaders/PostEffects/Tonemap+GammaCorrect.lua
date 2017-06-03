@@ -1,10 +1,6 @@
-function Script:Start()
-	
+function Script:Start()	
 	self.shader_tonemap 	= Shader:Load("Shaders/PostEffects/Utility/Tonemap.shader")		
 	self.shader_luminance 	= Shader:Load("Shaders/PostEffects/Utility/LuminanceSample.shader")	
-	
-	self.fstops = 4
-		
 end
 
 function Script:Render(camera,context,buffer,depth,diffuse,normals,emission)
@@ -35,7 +31,7 @@ function Script:Render(camera,context,buffer,depth,diffuse,normals,emission)
 	self.lumBuffer[0]:GetColorTexture():Bind(1)
 	
 	if self.shader_tonemap then self.shader_tonemap:Enable() end
-	self.shader_tonemap:SetFloat("ExposureBias", 1.0)
+	self.shader_tonemap:SetFloat("ExposureBias", 2.0)
 	
 	context:DrawRect(0, 0, buffer:GetWidth(), buffer:GetHeight())
 end

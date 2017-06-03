@@ -220,6 +220,7 @@ void main(void)
 	float specular;
 	float metalness;
 	float gloss;
+	float emissive;
 	float roughnessmip;
 	float specular_power;	
 	vec4 speccolor;	
@@ -258,7 +259,8 @@ void main(void)
 		{			
 			specular 	= surfacedata.b;				
 			gloss 		= 1 - surfacedata.r;
-			metalness 	= 1 - surfacedata.g;				
+			metalness 	= 1 - surfacedata.g;
+			emissive	= surfacedata.a;
 			speccolor 	= mix(albedo, vec4(specular), metalness);
 			
 			float alpha = max(0.001, gloss*gloss);							
@@ -275,16 +277,17 @@ void main(void)
 			
 			attenuation 		= n_dot_l;
 					
-		// Diffuse - BRDF
-			vec4 Fd 			= Fd_DisneyDiffuse(lightPower, n_dot_l, n_dot_v, l_dot_h, gloss);
-				 Fd 			*= albedo * metalness;				
-							
 		//Specular - BRDF
 			vec4  F  			= F_Schlick(speccolor, 1.0f, l_dot_h);	
 			float D 			= D_GGX(alpha, n_dot_h);
 			float V 			= V_SmithsGGX(alpha, n_dot_l, n_dot_v);								
-			vec4  Fr			= F * D * V * lightPower;
-
+			vec4  Fr			= F * D * V * lightPower;	
+					
+		// Diffuse - BRDF
+			vec4 Kd 			= vec4(1.0) - F;
+			vec4 Fd 			= Fd_DisneyDiffuse(lightPower, n_dot_l, n_dot_v, l_dot_h, gloss);
+				 Fd 			*= Kd * albedo * metalness;				
+		
 #ifdef USESHADOW
 			fade=1.0;
 			if (attenuation>LOWERLIGHTTHRESHHOLD)
@@ -378,17 +381,15 @@ void main(void)
 				}
 			}
 #endif		
-		// Energy conservation, TODO look into a more physically correct method
-			//Fd 			= (max(lightcolor - Fr, 0.00001)) * Fd; 	
-						
 			sample_out 	= ( Fd + Fr) * attenuation;			
-			sample_out  += albedo * metalness * ambientlight;			
+			sample_out  += albedo * metalness * ambientlight;
+			sample_out  += albedo * emissive * 24; //
 		} 
 		else 
 		{
-			sample_out *= lightcolor;
+			sample_out *= lightPower;
 		}
-		fragData0 += vec4(sample_out.xyz, 1.0);	
+		fragData0 += vec4(sample_out.xyz, 1.0);		
 	}
 	
 	fragData0 /= float(max(1,SAMPLES));
